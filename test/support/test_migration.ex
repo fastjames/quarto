@@ -13,6 +13,7 @@ defmodule Quarto.TestMigration do
       add(:title, :text)
       add(:position, :integer)
       add(:published_at, :utc_datetime)
+      add(:approved_at, :naive_datetime)
       add(:user_id, :integer)
       timestamps()
     end

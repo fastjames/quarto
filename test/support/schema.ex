@@ -18,6 +18,7 @@ defmodule Quarto.Post do
     field(:title, :string)
     field(:published_at, :utc_datetime)
     field(:position, :integer)
+    field(:approved_at, :naive_datetime)
 
     belongs_to(:user, Quarto.User)
 

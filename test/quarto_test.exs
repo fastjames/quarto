@@ -92,6 +92,38 @@ defmodule QuartoTest do
     end
   end
 
+  describe "paginate on naive_datetime desc" do
+    test "paginates forward", %{
+      posts: {p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12}
+    } do
+      opts =
+        @opts ++
+        [
+          coalesce: fn field, _position, value ->
+          case field do
+            :title -> "Z"
+            _ -> value
+          end
+        end
+        ]
+
+      page = posts_by_approved_at(:desc) |> paginate(opts)
+      assert to_ids(page.entries) == to_ids([p1, p2, p3, p4])
+      assert page.metadata.after == encode_cursor([p4.approved_at])
+
+      page = posts_by_approved_at(:desc) |> paginate(opts ++ [after: page.metadata.after])
+
+      assert to_ids(page.entries) == to_ids([p5, p6, p7, p8])
+      assert page.metadata.after == encode_cursor([p8.approved_at])
+
+      page = posts_by_approved_at(:desc) |> paginate(opts ++ [after: page.metadata.after])
+
+      assert to_ids(page.entries) == to_ids([p9, p10, p11, p12])
+      assert page.metadata.after == nil
+    end
+
+  end
+
   describe "paginate descending with nil, 2 cursor fields" do
     test "paginates forward", %{
       posts: {p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12}
@@ -717,6 +749,10 @@ defmodule QuartoTest do
     Quarto.Post |> order_by({^order, :title}) |> order_by({^order, :position})
   end
 
+  defp posts_by_approved_at(order) do
+    Quarto.Post |> order_by({^order, :approved_at})
+  end
+
   defp posts_by_published_at(order) do
     Quarto.Post |> order_by({^order, :published_at})
   end
@@ -799,21 +835,21 @@ defmodule QuartoTest do
     profile2 = insert(:profile, title: "Profile Bob", user: user2)
     profile3 = insert(:profile, title: "Profile Alice", user: user3)
 
-    p1 = insert(:post, user: user1, title: "A", position: 1, published_at: days_ago(1))
-    p2 = insert(:post, user: user2, title: nil, position: 2, published_at: days_ago(2))
-    p3 = insert(:post, user: user3, title: nil, position: 3, published_at: days_ago(3))
+    p1 = insert(:post, user: user1, title: "A", position: 1, published_at: days_ago(1), approved_at: naive_datetime_from_now(days: -1))
+    p2 = insert(:post, user: user2, title: nil, position: 2, published_at: days_ago(2), approved_at: naive_datetime_from_now(days: -2))
+    p3 = insert(:post, user: user3, title: nil, position: 3, published_at: days_ago(3), approved_at: naive_datetime_from_now(days: -3))
 
-    p4 = insert(:post, user: user1, title: nil, position: 4, published_at: days_ago(4))
-    p5 = insert(:post, user: user2, title: nil, position: 5, published_at: days_ago(5))
-    p6 = insert(:post, user: user3, title: nil, position: 6, published_at: days_ago(6))
+    p4 = insert(:post, user: user1, title: nil, position: 4, published_at: days_ago(4), approved_at: naive_datetime_from_now(days: -4))
+    p5 = insert(:post, user: user2, title: nil, position: 5, published_at: days_ago(5), approved_at: naive_datetime_from_now(days: -5))
+    p6 = insert(:post, user: user3, title: nil, position: 6, published_at: days_ago(6), approved_at: naive_datetime_from_now(days: -6))
 
-    p7 = insert(:post, user: user1, title: "B", position: 7, published_at: days_ago(7))
-    p8 = insert(:post, user: user2, title: "C", position: 8, published_at: days_ago(8))
-    p9 = insert(:post, user: user3, title: "D", position: 9, published_at: days_ago(9))
+    p7 = insert(:post, user: user1, title: "B", position: 7, published_at: days_ago(7), approved_at: naive_datetime_from_now(days: -7))
+    p8 = insert(:post, user: user2, title: "C", position: 8, published_at: days_ago(8), approved_at: naive_datetime_from_now(days: -8))
+    p9 = insert(:post, user: user3, title: "D", position: 9, published_at: days_ago(9), approved_at: naive_datetime_from_now(days: -9))
 
-    p10 = insert(:post, user: user1, title: "E", position: 10, published_at: days_ago(10))
-    p11 = insert(:post, user: user2, title: "F", position: 11, published_at: days_ago(11))
-    p12 = insert(:post, user: user3, title: "G", position: 12, published_at: days_ago(12))
+    p10 = insert(:post, user: user1, title: "E", position: 10, published_at: days_ago(10), approved_at: naive_datetime_from_now(days: -10))
+    p11 = insert(:post, user: user2, title: "F", position: 11, published_at: days_ago(11), approved_at: naive_datetime_from_now(days: -11))
+    p12 = insert(:post, user: user3, title: "G", position: 12, published_at: days_ago(12), approved_at: naive_datetime_from_now(days: -12))
 
     {:ok,
      profiles: {profile1, profile2, profile3},
@@ -822,6 +858,10 @@ defmodule QuartoTest do
 
   defp datetime_from_now(days: days) do
     DateTime.utc_now() |> DateTime.add(days * 86_400) |> DateTime.truncate(:second)
+  end
+
+  defp naive_datetime_from_now(days: days) do
+    NaiveDateTime.utc_now() |> NaiveDateTime.add(days * 86_400) |> NaiveDateTime.truncate(:second)
   end
 
   defp split_of_cursor_post(posts) do
