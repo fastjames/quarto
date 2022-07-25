@@ -5,6 +5,8 @@ defmodule Quarto.User do
   schema "users" do
     field(:name, :string)
     field(:photo, :string)
+    field(:logged_in_at, :naive_datetime)
+
     has_one(:profile, Quarto.Profile)
     timestamps()
   end

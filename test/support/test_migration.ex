@@ -26,6 +26,7 @@ defmodule Quarto.TestMigration do
     create table(:users) do
       add(:name, :text)
       add(:photo, :text)
+      add(:logged_in_at, :naive_datetime)
       timestamps()
     end
   end

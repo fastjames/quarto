@@ -92,6 +92,39 @@ defmodule QuartoTest do
     end
   end
 
+  describe "paginates descending with joined naive_datetime" do
+    test "paginates forward", %{
+      users: {_user1, user2, user3},
+      posts: {p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12}
+    } do
+      opts =
+        @opts ++
+        [
+          coalesce: fn field, _position, value ->
+          case field do
+            :title -> "Z"
+            _ -> value
+          end
+        end
+        ]
+
+      page = posts_by_user_logged_in_at(:desc) |> paginate(opts)
+      assert to_ids(page.entries) == to_ids([p3, p6, p9, p12])
+      assert page.metadata.after == encode_cursor([user3.logged_in_at, p12.published_at])
+
+      page = posts_by_user_logged_in_at(:desc) |> paginate(opts ++ [after: page.metadata.after])
+
+      assert to_ids(page.entries) == to_ids([p2, p5, p8, p11])
+      assert page.metadata.after == encode_cursor([user2.logged_in_at, p11.published_at])
+
+      page = posts_by_user_logged_in_at(:desc) |> paginate(opts ++ [after: page.metadata.after])
+
+      assert to_ids(page.entries) == to_ids([p1, p4, p7, p10])
+      assert page.metadata.after == nil
+    end
+
+  end
+
   describe "paginate descending with nil, 2 cursor fields" do
     test "paginates forward", %{
       posts: {p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12}
@@ -717,6 +750,14 @@ defmodule QuartoTest do
     Quarto.Post |> order_by({^order, :title}) |> order_by({^order, :position})
   end
 
+  defp posts_by_user_logged_in_at(order) do
+    Quarto.Post
+    |> join(:left, [p], u in assoc(p, :user), as: :user)
+    |> preload([p, u], user: u)
+    |> order_by([p, u], {^order, u.logged_in_at})
+    |> order_by({^order, :published_at})
+  end
+
   defp posts_by_published_at(order) do
     Quarto.Post |> order_by({^order, :published_at})
   end
@@ -791,9 +832,9 @@ defmodule QuartoTest do
   end
 
   defp create_posts(_context) do
-    user3 = insert(:user, name: "Alice")
-    user2 = insert(:user, name: "Bob")
-    user1 = insert(:user, name: "Charlie", photo: "photo.jpg")
+    user3 = insert(:user, name: "Alice", logged_in_at: naive_datetime_from_now(days: -1))
+    user2 = insert(:user, name: "Bob", logged_in_at: naive_datetime_from_now(days: -2))
+    user1 = insert(:user, name: "Charlie", photo: "photo.jpg", logged_in_at: naive_datetime_from_now(days: -3))
 
     profile1 = insert(:profile, title: "Profile Charlie", user: user1)
     profile2 = insert(:profile, title: "Profile Bob", user: user2)
@@ -816,12 +857,19 @@ defmodule QuartoTest do
     p12 = insert(:post, user: user3, title: "G", position: 12, published_at: days_ago(12))
 
     {:ok,
+     users: {user1, user2, user3},
      profiles: {profile1, profile2, profile3},
      posts: {p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12}}
   end
 
   defp datetime_from_now(days: days) do
     DateTime.utc_now() |> DateTime.add(days * 86_400) |> DateTime.truncate(:second)
+  end
+
+  defp naive_datetime_from_now(days: days) do
+    NaiveDateTime.utc_now()
+    |> NaiveDateTime.add(days * 86_400)
+    |> NaiveDateTime.truncate(:second)
   end
 
   defp split_of_cursor_post(posts) do
